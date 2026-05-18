@@ -1,0 +1,195 @@
+---
+title: "Trabajo Final 9219: Nuevo León"
+author: 
+- "Alcibar Perez Atzabel"
+- "Cisneros Calavazo Bitia Eleonai"
+format: pdf
+editor: visual
+---
+
+## Introduccion
+
+En este proyecto se construyen tablas de vida para el estado de Nuevo León en los años 2010, 2019 y 2021, separando los resultados por sexo. El objetivo es estimar indicadores de mortalidad, además de analizar los cambios observados en la mortalidad, especialmente durante 2021 por el impacto de la COVID-19.
+
+#Comportamiento de la mortalidad en Nuevo León
+
+Desde 2010, Nuevo León ha presentado un aumento gradual de la mortalidad debido principalmente al envejecimiento de la población y al predominio de enfermedades crónicas como diabetes, enfermedades del corazón y cáncer. La esperanza de vida se mantuvo relativamente alta, alrededor de 76–79 años, siendo mayor en mujeres que en hombres. También disminuyó la mortalidad infantil gracias a mejores servicios de salud.
+
+A partir de 2019, la mortalidad cambió de forma importante por la pandemia de COVID-19. Entre 2020 y 2021 aumentaron considerablemente las defunciones y la esperanza de vida disminuyó temporalmente, sobre todo en hombres. Después de la pandemia, las principales causas de muerte siguieron siendo las enfermedades crónico-degenerativas. Además, comenzaron a destacar otros problemas como el aumento de suicidios y los efectos del envejecimiento poblacional.
+
+En consecuencia , Nuevo León muestra una transición hacia un perfil de mortalidad dominado por enfermedades no transmisibles y por los retos derivados de una población cada vez más envejecida. En general, la mortalidad en Nuevo León refleja:
+
+-   envejecimiento poblacional,
+-   predominio de enfermedades no transmisibles,
+-   impacto fuerte pero temporal del COVID-19,
+-   mayores niveles de mortalidad en hombres que en mujeres.
+
+# Diagrama de flujo del proceso
+
+El diagrama de flujo del proceso de construcción de las tablas de vida se encuentra en el archivo `Diagrama_proyecto.pdf`.
+
+Este diagrama resume el procedimiento seguido desde la definición del alcance del proyecto, la descarga de datos de INEGI y CONAPO, la construcción de la base en Excel, el cálculo de los indicadores de tabla de vida, la generación de resultados en RStudio/Quarto y la publicación final en GitHub. 
+![Diagrama de flujo del proceso para construir las tablas de vida]("data/diagrama_flujo_tablas_vida.png")
+
+# Fórmulas utilizadas
+
+Para construir las tablas de vida se utilizaron las siguientes fórmulas.
+
+La tasa central de mortalidad se calculó como:
+
+$begin:math:display$ m_x = \\frac{D_x}{P_x} $end:math:display$
+
+donde $begin:math:text$D_x$end:math:text$ representa las defunciones observadas en la edad o grupo de edad $begin:math:text$x$end:math:text$, y $begin:math:text$P_x$end:math:text$ representa la población expuesta al riesgo.
+
+La probabilidad de morir se aproximó mediante:
+
+$begin:math:display$ q_x = \\frac{m_x}{1 + 0.5m_x} $end:math:display$
+
+La raíz de la tabla de vida se estableció como:
+
+$begin:math:display$ l_0 = 100000 $end:math:display$
+
+Las defunciones de la tabla de vida se calcularon como:
+
+$begin:math:display$ d_x = l_x q_x $end:math:display$
+
+Los sobrevivientes del siguiente intervalo se obtuvieron con:
+
+$begin:math:display$ l\_{x+n} = l_x - d_x $end:math:display$
+
+Los años-persona vividos en el intervalo se aproximaron como:
+
+$begin:math:display$ L_x = l_x - 0.5d_x $end:math:display$
+
+Los años-persona acumulados desde la edad $begin:math:text$x$end:math:text$ se calcularon como:
+
+$begin:math:display$ T_x = \\sum\_{y=x}\^{\\omega} L_y $end:math:display$
+
+La esperanza de vida a la edad $begin:math:text$x$end:math:text$ se obtuvo mediante:
+
+$begin:math:display$ e_x = \\frac{T_x}{l_x} $end:math:display$
+
+Para representar el crecimiento exponencial de la población se considera:
+
+$begin:math:display$ P(t) = P_0 e\^{rt} $end:math:display$
+
+#Código utilizado
+
+```{r}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+
+tabla_vida <- fread("data/base_nuevo_leon.csv")
+
+names(tabla_vida)
+head(tabla_vida)
+```
+
+```{r}
+esperanza_vida <- tabla_vida %>%
+  filter(edad_inicio == 0) %>%
+  select(anio, sexo, esperanza_vida_al_nacer = ex)
+
+kable(
+  esperanza_vida,
+  caption = "Esperanza de vida al nacer por sexo y año en Nuevo León",
+  digits = 2
+)
+```
+
+# Cuadro de esperanza de vida al nacer
+
+El siguiente cuadro resume la esperanza de vida al nacer estimada para Nuevo León en los años 2010, 2019 y 2021, separada por sexo. Este valor corresponde a la columna \(e_x\) cuando la edad inicial es 0.
+
+```{r}
+kable(
+  esperanza_vida,
+  caption = "Esperanza de vida al nacer por sexo y año en Nuevo León",
+  digits = 2
+)
+```
+
+A continuación se presentan gráficas que permiten interpretar el comportamiento de la mortalidad en Nuevo León por año y sexo.
+
+## Esperanza de vida al nacer
+
+```{r}
+ggplot(esperanza_vida, aes(x = factor(anio), y = esperanza_vida_al_nacer, group = sexo)) +
+  geom_line(aes(linetype = sexo)) +
+  geom_point(aes(shape = sexo)) +
+  labs(
+    title = "Esperanza de vida al nacer por sexo en Nuevo León",
+    x = "Año",
+    y = "Esperanza de vida al nacer"
+  ) +
+  theme_minimal()
+```
+
+## Probabilidad de muerte qx por edad
+
+```{r}
+ggplot(tabla_vida, aes(x = edad_inicio, y = qx, group = interaction(anio, sexo))) +
+  geom_line(aes(linetype = sexo)) +
+  facet_wrap(~ anio) +
+  labs(
+    title = "Probabilidad de muerte qx por edad, sexo y año",
+    x = "Edad inicial del grupo",
+    y = "qx"
+  ) +
+  theme_minimal()
+```
+
+## Sobrevivientes lx por edad
+
+```{r}
+ggplot(tabla_vida, aes(x = edad_inicio, y = lx, group = interaction(anio, sexo))) +
+  geom_line(aes(linetype = sexo)) +
+  facet_wrap(~ anio) +
+  labs(
+    title = "Sobrevivientes lx por edad, sexo y año",
+    x = "Edad inicial del grupo",
+    y = "lx"
+  ) +
+  theme_minimal()
+```
+
+## Defunciones por edad
+
+```{r}
+ggplot(tabla_vida, aes(x = edad_inicio, y = defunciones, group = interaction(anio, sexo))) +
+  geom_line(aes(linetype = sexo)) +
+  facet_wrap(~ anio) +
+  labs(
+    title = "Defunciones por edad, sexo y año",
+    x = "Edad inicial del grupo",
+    y = "Defunciones"
+  ) +
+  theme_minimal()
+```
+
+# Análisis de resultados
+
+Los resultados permiten comparar el comportamiento de la mortalidad en Nuevo León durante tres momentos: 2010, 2019 y 2021. El año 2010 funciona como referencia inicial, 2019 representa una situación previa a la pandemia y 2021 permite observar los efectos del periodo de COVID-19.
+
+En términos generales, se espera que la esperanza de vida al nacer sea mayor en mujeres que en hombres. Este comportamiento es común en los estudios de mortalidad, ya que los hombres suelen presentar mayores riesgos de muerte en distintas edades, asociados a factores biológicos, sociales, laborales y de comportamiento.
+
+Al comparar 2019 con 2021, se observa el impacto de la pandemia. Si la esperanza de vida disminuye en 2021, esto indica un deterioro temporal de las condiciones de mortalidad. Este cambio puede relacionarse con el aumento de defunciones durante la emergencia sanitaria por COVID-19, tanto por causas directas como por efectos indirectos en la atención médica.
+
+Las gráficas de $begin:math:text$q_x$end:math:text$ permiten observar cómo aumenta la probabilidad de morir conforme avanza la edad. A su vez, la curva de $begin:math:text$l_x$end:math:text$ muestra la disminución progresiva de la cohorte hipotética de 100,000 personas. Estas herramientas permiten analizar de manera visual las diferencias entre años y sexos.
+
+
+# Conclusiones
+
+La construcción de tablas de vida permite resumir el comportamiento de la mortalidad de una población. En este trabajo se estimaron indicadores para Nuevo León en 2010, 2019 y 2021, separados por sexo.
+
+El análisis también permite observar diferencias entre hombres y mujeres, así como la influencia del envejecimiento poblacional y las enfermedades crónico-degenerativas en el perfil de mortalidad de Nuevo León.
+
+# Fuentes consultadas
+
+-   INEGI. Censo de Población y Vivienda 2020.
+-   INEGI. Estadísticas de Defunciones Registradas.
+-   CONAPO. Proyecciones de la población de México y de las entidades federativas.
+-   Material de clase sobre tablas de vida y mortalidad.
+

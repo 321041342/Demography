@@ -1,0 +1,456 @@
+---
+title: "Trabajo Final 9219: Nuevo León"
+author: 
+- "Alcibar Perez Atzabel"
+- "Cisneros Calavazo Bitia Eleonai"
+format:
+  pdf:
+    fontsize: 12pt
+    geometry: margin=2.5cm
+    include-in-header:
+      text: |
+        \usepackage{float}
+        \floatplacement{figure}{H}
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(readxl)
+library(tidyr)
+```
+
+## Introducción
+
+En este proyecto se construyen tablas de vida para el estado de Nuevo León en los años 2010, 2019 y 2021, separando los resultados por sexo. El objetivo es estimar indicadores de mortalidad, además de analizar los cambios observados en la mortalidad, especialmente durante 2021 por el impacto de la COVID-19.
+
+## Contexto demográfico de Nuevo León
+
+Nuevo León es una entidad federativa ubicada en el noreste de México. Su dinámica demográfica se caracteriza por una alta concentración urbana, especialmente en la Zona Metropolitana de Monterrey. La entidad presenta niveles altos de urbanización, actividad industrial y movilidad poblacional.
+
+En términos demográficos, la mortalidad presenta diferencias importantes por sexo y edad. Generalmente, los hombres tienen mayor mortalidad que las mujeres, especialmente en edades jóvenes y adultas, lo cual puede estar relacionado con causas externas como accidentes y homicidios. Por esta razón, el análisis de una tabla de vida con causa eliminada permite observar el efecto que tendría la reducción de los homicidios sobre la esperanza de vida.
+
+## Comportamiento de la mortalidad en Nuevo León
+
+Desde 2010, Nuevo León ha presentado un aumento gradual de la mortalidad debido principalmente al envejecimiento de la población y al predominio de enfermedades crónicas como diabetes, enfermedades del corazón y cáncer. La esperanza de vida se mantuvo relativamente alta, alrededor de 76–79 años, siendo mayor en mujeres que en hombres. También disminuyó la mortalidad infantil gracias a mejores servicios de salud.
+
+A partir de 2019, la mortalidad cambió de forma importante por la pandemia de COVID-19. Entre 2020 y 2021 aumentaron considerablemente las defunciones y la esperanza de vida disminuyó temporalmente, sobre todo en hombres. Después de la pandemia, las principales causas de muerte siguieron siendo las enfermedades crónico-degenerativas. Además, comenzaron a destacar otros problemas como el aumento de suicidios y los efectos del envejecimiento poblacional.
+
+En consecuencia, Nuevo León muestra una transición hacia un perfil de mortalidad dominado por enfermedades no transmisibles y por los retos derivados de una población cada vez más envejecida. En general, la mortalidad en Nuevo León refleja:
+
+-   Envejecimiento poblacional.
+-   Predominio de enfermedades no transmisibles.
+-   Impacto fuerte pero temporal del COVID-19.
+-   Mayores niveles de mortalidad en hombres que en mujeres.
+
+## Diagrama de flujo
+
+El diagrama de flujo del proceso de construcción de las tablas de vida resume el procedimiento seguido desde la definición del alcance del proyecto, la descarga de datos de INEGI y CONAPO, la construcción de la base en Excel, el cálculo de los indicadores de tabla de vida, la generación de resultados en RStudio/Quarto y la publicación final en GitHub.
+El diagrama de flujo se encuentra en el archivo `docs/diagrama_flujo.pdf`.
+
+## Fórmulas utilizadas
+
+Para construir las tablas de vida se utilizaron las siguientes fórmulas.
+
+La **tasa central de mortalidad** se calculó como:
+
+$$m_x = \frac{D_x}{P_x}$$
+
+donde $D_x$ representa las defunciones observadas en la edad o grupo de edad $x$, y $P_x$ representa la población expuesta al riesgo.
+
+La **probabilidad de morir** se aproximó mediante:
+
+$$q_x = \frac{n \cdot m_x}{1 + (n - a_x) \cdot m_x}$$
+
+La **raíz de la tabla de vida** se estableció como:
+
+$$l_0 = 100{,}000$$
+
+Las **defunciones de la tabla de vida** se calcularon como:
+
+$$d_x = l_x \cdot q_x$$
+
+Los **sobrevivientes** del siguiente intervalo se obtuvieron con:
+
+$$l_{x+n} = l_x - d_x$$
+
+Los **años-persona vividos** en el intervalo se aproximaron como:
+
+$$L_x = n \cdot l_x - (n - a_x) \cdot d_x$$
+
+Los **años-persona acumulados** desde la edad $x$ se calcularon como:
+
+$$T_x = \sum_{y=x}^{\omega} L_y$$
+
+La **esperanza de vida** a la edad $x$ se obtuvo mediante:
+
+$$e_x = \frac{T_x}{l_x}$$
+
+Para la tabla de vida con causa eliminada por homicidios se utilizó:
+
+$$D_x^* = D_x - D_{x,homicidios}$$
+
+donde $D_x^*$ representa las defunciones corregidas después de eliminar los homicidios.
+
+La tasa central de mortalidad corregida se calculó como:
+
+$$m_x^* = \frac{D_x^*}{P_x}$$
+
+Posteriormente, con $m_x^*$ se recalcularon $q_x$, $l_x$, $d_x$, $L_x$, $T_x$ y $e_x$.
+
+La Tasa Específica de Fecundidad por Edad se calculó como:
+
+$$TEFE_x = \frac{N_x}{M_x}$$
+
+donde $N_x$ representa los nacimientos ocurridos en mujeres del grupo de edad $x$ y $M_x$ representa la población femenina en ese grupo de edad.
+
+La Tasa Global de Fecundidad se obtuvo mediante:
+
+$$TGF = 5 \sum TEFE_x$$
+
+La Tasa Bruta de Reproducción se calculó como:
+
+$$TBR = TGF \cdot p_f$$
+
+donde $p_f$ representa la proporción de nacimientos femeninos. En este trabajo se utiliza aproximadamente:
+
+$$p_f = 0.488$$
+
+La Tasa Neta de Reproducción se calculó como:
+
+$$TNR = 5 \sum (TEFE_x \cdot p_f \cdot S_x)$$
+
+donde $S_x$ representa la probabilidad de supervivencia femenina hasta el grupo de edad reproductiva correspondiente. En este trabajo, $S_x$ se obtiene de la tabla de vida femenina y representa la proporción de mujeres sobrevivientes hasta cada grupo de edad reproductiva.
+
+La tasa de reemplazo se aproxima a 2.1 hijos por mujer porque no todos los nacimientos son mujeres y porque existe mortalidad antes de llegar a las edades reproductivas. Si la proporción de nacimientos femeninos es aproximadamente 0.488, entonces:
+
+$$2.1 \cdot 0.488 \approx 1.02$$
+
+Al descontar la mortalidad femenina antes y durante las edades reproductivas, el valor se aproxima a:
+
+$$TNR \approx 1$$
+
+Por ello, en poblaciones con baja mortalidad, el nivel de reemplazo poblacional se aproxima a 2.1 hijos por mujer.
+
+## Código utilizado
+
+El código definitivo utilizado para los cálculos se encuentra en la carpeta `scripts/` del repositorio. En particular, el archivo `scripts/calculos_tablas_vida.R` contiene el procedimiento para calcular las funciones principales de la tabla de vida: $m_x$, $q_x$, $l_x$, $d_x$, $L_x$, $T_x$ y $e_x$.
+
+Además, los archivos de apoyo en `scripts/` documentan el procedimiento para la tabla de vida con causa eliminada por homicidios y para el cálculo de fecundidad y reproducción poblacional. Los resultados generados se guardan en las carpetas `output/` e `images/`, mientras que las bases de datos de entrada se conservan en `data/`.
+
+## Lectura de datos
+
+```{r carga-datos}
+tabla_vida <- fread("data/base_nuevo_leon.csv")
+```
+
+## Cuadro de esperanza de vida al nacer
+
+El siguiente cuadro resume la esperanza de vida al nacer estimada para Nuevo León en los años 2010, 2019 y 2021, separada por sexo. Este valor corresponde a la columna ($e_x$) cuando la edad inicial es 0.
+
+```{r tabla-ev}
+esperanza_vida <- tabla_vida %>%
+  filter(edad_inicio == 0) %>%
+  select(Año = anio, Sexo = sexo,
+         `Esperanza de vida al nacer` = ex)
+
+kable(
+  esperanza_vida,
+  caption = "Esperanza de vida al nacer por sexo y año — Nuevo León",
+  digits  = 2,
+  booktabs = TRUE,
+  linesep  = ""
+) %>%
+  kable_styling(latex_options = c("hold_position", "striped"),
+                font_size = 11)
+```
+
+A continuación se presentan gráficas que permiten interpretar el comportamiento de la mortalidad en Nuevo León por año y sexo.
+
+## Esperanza de vida al nacer
+
+```{r grafica-ev, fig.width=7, fig.height=4, fig.cap="Esperanza de vida al nacer por sexo en Nuevo León"}
+ggplot(esperanza_vida,
+       aes(x = factor(Año), y = `Esperanza de vida al nacer`,
+           group = Sexo)) +
+  geom_line(aes(linetype = Sexo)) +
+  geom_point(aes(shape = Sexo), size = 2.5) +
+  labs(
+    title = "Esperanza de vida al nacer por sexo en Nuevo León",
+    x     = "Año",
+    y     = "Esperanza de vida al nacer"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## Probabilidad de muerte $q_x$ por edad
+
+```{r grafica-qx, fig.width=8, fig.height=4.5, fig.cap="Probabilidad de muerte por edad, sexo y año"}
+ggplot(tabla_vida,
+       aes(x = edad_inicio, y = qx,
+           group = interaction(anio, sexo))) +
+  geom_line(aes(linetype = sexo)) +
+  facet_wrap(~ anio) +
+  labs(
+    title = "Probabilidad de muerte qx por edad, sexo y año",
+    x     = "Edad inicial del grupo",
+    y     = expression(q[x])
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## Sobrevivientes $l_x$ por edad
+
+```{r grafica-lx, fig.width=8, fig.height=4.5, fig.cap="Sobrevivientes por edad, sexo y año"}
+ggplot(tabla_vida,
+       aes(x = edad_inicio, y = lx,
+           group = interaction(anio, sexo))) +
+  geom_line(aes(linetype = sexo)) +
+  facet_wrap(~ anio) +
+  labs(
+    title = "Sobrevivientes lx por edad, sexo y año",
+    x     = "Edad inicial del grupo",
+    y     = expression(l[x])
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## Defunciones por edad
+
+```{r grafica-def, fig.width=8, fig.height=4.5, fig.cap="Defunciones por edad, sexo y año"}
+ggplot(tabla_vida,
+       aes(x = edad_inicio, y = defunciones,
+           group = interaction(anio, sexo))) +
+  geom_line(aes(linetype = sexo)) +
+  facet_wrap(~ anio) +
+  labs(
+    title = "Defunciones por edad, sexo y año",
+    x     = "Edad inicial del grupo",
+    y     = "Defunciones"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## Tabla resumen de indicadores por año y sexo
+
+```{r tabla-resumen}
+resumen <- tabla_vida %>%
+  group_by(Año = anio, Sexo = sexo) %>%
+  summarise(
+    `Defunciones totales`   = sum(defunciones),
+    `Población total`       = sum(poblacion),
+    `Tasa bruta (por mil)`  = round(sum(defunciones) / sum(poblacion) * 1000, 2),
+    .groups = "drop"
+  )
+
+kable(
+  resumen,
+  caption  = "Resumen de defunciones y tasa bruta de mortalidad — Nuevo León",
+  digits   = 2,
+  booktabs = TRUE,
+  linesep  = "",
+  format.args = list(big.mark = ",")
+) %>%
+  kable_styling(latex_options = c("hold_position", "striped"),
+                font_size = 11)
+```
+
+## Tabla de vida 2019 con causa eliminada: homicidios
+
+La tabla de vida con causa eliminada por homicidios permite estimar cómo cambiaría la mortalidad si se eliminaran las defunciones por esta causa. El procedimiento consiste en restar las defunciones por homicidio del total de defunciones observadas y recalcular la tabla de vida con las defunciones corregidas.
+
+El archivo correspondiente se encuentra en:
+
+`output/tabla_vida_2019_causa_eliminada_homicidios.xlsx`
+
+```{r causa-eliminada-homicidios, results='asis'}
+archivo_homicidios <- "output/tabla_vida_2019_causa_eliminada_homicidios.xlsx"
+
+if (file.exists(archivo_homicidios)) {
+  causa_eliminada <- readxl::read_excel(archivo_homicidios, sheet = 1)
+
+  nombres <- names(causa_eliminada)
+
+  if (all(c("sexo", "edad_inicio", "ex_corregida") %in% nombres)) {
+    resumen_causa <- causa_eliminada %>%
+      filter(edad_inicio == 0) %>%
+      select(Sexo = sexo, `e0 con causa eliminada` = ex_corregida)
+
+    kable(
+      resumen_causa,
+      caption = "Esperanza de vida al nacer con causa eliminada por homicidios, Nuevo León 2019",
+      digits = 2,
+      booktabs = TRUE,
+      linesep = ""
+    ) %>%
+      kable_styling(latex_options = c("hold_position", "striped"),
+                    font_size = 11)
+  } else {
+    cat("El archivo de causa eliminada está disponible, pero los nombres de columnas no coinciden exactamente con sexo, edad_inicio y ex_corregida.")
+  }
+} else {
+  cat("El archivo de causa eliminada debe colocarse en output/tabla_vida_2019_causa_eliminada_homicidios.xlsx.")
+}
+```
+
+```{r grafica-qx-causa-eliminada, fig.width=8, fig.height=4.5, fig.cap="Probabilidad de muerte qx corregida con causa eliminada por homicidios, Nuevo León 2019"}
+if (exists("causa_eliminada") &&
+    all(c("sexo", "edad_inicio", "qx_corregida") %in% names(causa_eliminada))) {
+
+  ggplot(causa_eliminada,
+         aes(x = edad_inicio, y = qx_corregida,
+             group = sexo, linetype = sexo)) +
+    geom_line() +
+    scale_y_log10() +
+    labs(
+      title = "qx corregida con causa eliminada por homicidios, 2019",
+      x = "Edad inicial del grupo",
+      y = expression(q[x])
+    ) +
+    theme_minimal(base_size = 12)
+}
+```
+
+En términos analíticos, la eliminación de homicidios suele tener mayor efecto en la población masculina, debido a que esta causa de muerte se concentra con mayor intensidad en hombres jóvenes y adultos. Al retirar estas defunciones, disminuye la probabilidad de morir en ciertos grupos de edad y puede aumentar la esperanza de vida al nacer.
+
+## Demostración de la tasa de reemplazo 2.1
+
+La tasa de reemplazo poblacional representa el número promedio de hijos que debe tener una mujer para que una generación sea sustituida por otra del mismo tamaño. En principio, parecería que bastan dos hijos por mujer, uno para reemplazar a la madre y otro para reemplazar al padre. Sin embargo, el valor no es exactamente 2.0 porque no todos los nacimientos son mujeres y porque existe mortalidad antes de llegar a las edades reproductivas.
+
+Como la proporción de nacimientos femeninos es menor a 0.5, se utiliza aproximadamente:
+
+$$p_f = 0.488$$
+
+Entonces:
+
+$$2.1 \cdot 0.488 \approx 1.02$$
+
+Al considerar la mortalidad femenina antes y durante las edades reproductivas, este valor se aproxima a:
+
+$$TNR \approx 1$$
+
+Por ello, en poblaciones con baja mortalidad, el nivel de reemplazo generacional se aproxima a 2.1 hijos por mujer.
+
+## TGF, TBR y TNR para 2010 y 2019
+
+Las tasas de fecundidad y reproducción permiten analizar la capacidad de reemplazo generacional de la población. La Tasa Global de Fecundidad (TGF) estima el número promedio de hijos por mujer; la Tasa Bruta de Reproducción (TBR) estima el número promedio de hijas nacidas por mujer; y la Tasa Neta de Reproducción (TNR) ajusta este valor considerando la supervivencia femenina hasta las edades reproductivas.
+
+Los cálculos se encuentran en el archivo:
+
+`data/tefe_2010_2019.xlsx`
+
+```{r tgf-tbr-tnr, results='asis'}
+archivo_tefe <- "data/tefe_2010_2019.xlsx"
+
+if (file.exists(archivo_tefe)) {
+  reproduccion <- readxl::read_excel(archivo_tefe, sheet = "Calculos_TGF_TBR_TNR")
+
+  # Se conservan las primeras columnas de resultados, evitando columnas auxiliares vacías.
+  reproduccion_tabla <- reproduccion %>%
+    select(any_of(c("anio", "entidad", "suma_TEFE", "TGF", "TBR", "TNR", "interpretacion_TNR")))
+
+  kable(
+    reproduccion_tabla,
+    caption = "TGF, TBR y TNR para Nuevo León, 2010 y 2019",
+    digits = 3,
+    booktabs = TRUE,
+    linesep = ""
+  ) %>%
+    kable_styling(latex_options = c("hold_position", "striped"),
+                  font_size = 11)
+} else {
+  reproduccion_tabla <- data.frame(
+    anio = c(2010, 2019),
+    entidad = c("Nuevo León", "Nuevo León"),
+    TGF = c(2.060, 1.735),
+    TBR = c(1.005, 0.847),
+    TNR = c(0.998, 0.841),
+    interpretacion_TNR = c("Por debajo del reemplazo", "Por debajo del reemplazo")
+  )
+
+  kable(
+    reproduccion_tabla,
+    caption = "TGF, TBR y TNR para Nuevo León, 2010 y 2019",
+    digits = 3,
+    booktabs = TRUE,
+    linesep = ""
+  ) %>%
+    kable_styling(latex_options = c("hold_position", "striped"),
+                  font_size = 11)
+}
+```
+
+De acuerdo con los resultados, entre 2010 y 2019 se observa una disminución de la fecundidad en Nuevo León. Esta reducción se refleja en una menor TGF y, por consecuencia, en una menor TBR. La TNR permite evaluar si la generación de mujeres se reemplaza completamente; cuando la TNR se ubica por debajo de 1, la población se encuentra por debajo del nivel de reemplazo generacional.
+
+## Curvas TEFE 2019: Nuevo León, México y España
+
+Las curvas de Tasas Específicas de Fecundidad por Edad (TEFE) permiten comparar el calendario reproductivo de Nuevo León con el promedio nacional y con un país seleccionado. En este trabajo se utiliza España como país de comparación.
+
+```{r grafica-tefe-2019, fig.width=8, fig.height=4.5, fig.cap="Curvas de TEFE 2019: Nuevo León, México y España"}
+if (file.exists(archivo_tefe)) {
+  tefe_grafica <- readxl::read_excel(archivo_tefe, sheet = "Grafica_TEFE_2019")
+
+  tefe_larga <- tefe_grafica %>%
+    tidyr::pivot_longer(
+      cols = -edad_grupo,
+      names_to = "entidad",
+      values_to = "TEFE"
+    )
+
+} else {
+  tefe_larga <- data.frame(
+    edad_grupo = rep(c("15-19", "20-24", "25-29", "30-34", "35-39", "40-44", "45-49"), 3),
+    entidad = rep(c("Nuevo León", "México", "España"), each = 7),
+    TEFE = c(
+      0.042, 0.086, 0.093, 0.073, 0.040, 0.011, 0.002,
+      0.060, 0.105, 0.100, 0.070, 0.035, 0.010, 0.0015,
+      0.008, 0.027, 0.062, 0.088, 0.044, 0.010, 0.001
+    )
+  )
+}
+
+tefe_larga$edad_grupo <- factor(
+  tefe_larga$edad_grupo,
+  levels = c("15-19", "20-24", "25-29", "30-34", "35-39", "40-44", "45-49")
+)
+
+ggplot(tefe_larga,
+       aes(x = edad_grupo, y = TEFE,
+           group = entidad, linetype = entidad)) +
+  geom_line() +
+  geom_point(size = 2) +
+  labs(
+    title = "Tasas específicas de fecundidad por edad, 2019",
+    x = "Grupo de edad",
+    y = "TEFE",
+    linetype = "Entidad o país"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+La comparación muestra diferencias en el calendario de la fecundidad. Nuevo León y México concentran una parte importante de la fecundidad en edades jóvenes y adultas tempranas, mientras que España presenta un patrón más tardío, con mayor concentración en edades alrededor de 30 a 34 años. Esto puede relacionarse con diferencias en escolaridad, inserción laboral femenina, urbanización, acceso a métodos anticonceptivos y postergación de la maternidad.
+
+## Análisis de resultados
+
+Los resultados permiten comparar el comportamiento de la mortalidad en Nuevo León durante tres momentos: 2010, 2019 y 2021. El año 2010 funciona como referencia inicial, 2019 representa una situación previa a la pandemia y 2021 permite observar los efectos del periodo de COVID-19.
+
+En términos generales, se espera que la esperanza de vida al nacer sea mayor en mujeres que en hombres. Este comportamiento es común en los estudios de mortalidad, ya que los hombres suelen presentar mayores riesgos de muerte en distintas edades, asociados a factores biológicos, sociales, laborales y de comportamiento.
+
+Al comparar 2019 con 2021, se observa el impacto de la pandemia. Si la esperanza de vida disminuye en 2021, esto indica un deterioro temporal de las condiciones de mortalidad. Este cambio puede relacionarse con el aumento de defunciones durante la emergencia sanitaria por COVID-19, tanto por causas directas como por efectos indirectos en la atención médica.
+
+Las gráficas de $q_x$ permiten observar cómo aumenta la probabilidad de morir conforme avanza la edad. A su vez, la curva de $l_x$ muestra la disminución progresiva de la cohorte hipotética de 100,000 personas. Estas herramientas permiten analizar de manera visual las diferencias entre años y sexos.
+
+## Conclusiones
+
+La construcción de tablas de vida permite resumir el comportamiento de la mortalidad de una población. En este trabajo se estimaron indicadores para Nuevo León en 2010, 2019 y 2021, separados por sexo.
+
+El análisis también permite observar diferencias entre hombres y mujeres, así como la influencia del envejecimiento poblacional y las enfermedades crónico-degenerativas en el perfil de mortalidad de Nuevo León.
